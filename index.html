@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flapping Bird</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(180deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+      font-family: "Press Start 2P", cursive;
+      overflow: hidden;
+    }
+
+    .game-container {
+      position: relative;
+      width: 400px;
+      height: 600px;
+      border: 4px solid #2d3436;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 40px rgba(255, 217, 61, 0.2), 0 0 80px rgba(0, 184, 148, 0.1);
+    }
+
+    #gameCanvas {
+      display: block;
+      background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+    }
+
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: rgba(26, 26, 46, 0.85);
+      color: #ffffff;
+      text-align: center;
+      transition: opacity 0.3s ease;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .title {
+      font-size: 28px;
+      color: #ffd93d;
+      text-shadow: 4px 4px 0 #ff6b35, 6px 6px 0 #1a1a2e;
+      margin-bottom: 40px;
+      animation: float 2s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .instruction {
+      font-size: 12px;
+      color: #00b894;
+      margin-top: 30px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .score-display {
+      font-size: 16px;
+      margin: 15px 0;
+    }
+
+    .current-score {
+      font-size: 48px;
+      color: #ffd93d;
+      text-shadow: 3px 3px 0 #ff6b35;
+    }
+
+    .high-score {
+      font-size: 14px;
+      color: #00b894;
+    }
+
+    .game-over-title {
+      font-size: 32px;
+      color: #ff6b35;
+      text-shadow: 3px 3px 0 #1a1a2e;
+      margin-bottom: 30px;
+    }
+
+    .bird-preview {
+      width: 60px;
+      height: 45px;
+      position: relative;
+      animation: flap 0.3s ease-in-out infinite alternate;
+    }
+
+    @keyframes flap {
+      0% { transform: rotate(-15deg) scaleY(1); }
+      100% { transform: rotate(15deg) scaleY(0.9); }
+    }
+
+    .preview-body {
+      width: 50px;
+      height: 35px;
+      background: #ffd93d;
+      border-radius: 50% 50% 50% 50%;
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      box-shadow: inset -5px -5px 10px rgba(0,0,0,0.2);
+    }
+
+    .preview-eye {
+      width: 12px;
+      height: 12px;
+      background: #ffffff;
+      border-radius: 50%;
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      box-shadow: inset 2px 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .preview-eye::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: #1a1a2e;
+      border-radius: 50%;
+      position: absolute;
+      top: 3px;
+      right: 2px;
+    }
+
+    .preview-beak {
+      width: 15px;
+      height: 10px;
+      background: #ff6b35;
+      border-radius: 0 50% 50% 50%;
+      position: absolute;
+      top: 15px;
+      right: 2px;
+    }
+
+    .preview-wing {
+      width: 20px;
+      height: 15px;
+      background: #ff6b35;
+      border-radius: 50%;
+      position: absolute;
+      top: 18px;
+      left: 8px;
+    }
+
+    /* Mute Button */
+    .mute-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 40px;
+      height: 40px;
+      background: rgba(45, 52, 54, 0.8);
+      border: 2px solid #636e72;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: all 0.2s ease;
+      z-index: 100;
+    }
+
+    .mute-btn:hover {
+      background: rgba(99, 110, 114, 0.9);
+      transform: scale(1.05);
+    }
+
+    .mute-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: #ffffff;
+    }
+
+    .mute-btn.muted svg .sound-wave {
+      opacity: 0;
+    }
+
+    .mute-btn.muted::after {
+      content: '';
+      position: absolute;
+      width: 24px;
+      height: 2px;
+      background: #ff6b35;
+      transform: rotate(-45deg);
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <button class="mute-btn" id="muteBtn" title="Toggle Sound">
+      <svg viewBox="0 0 24 24">
+        <path d="M3 9v6h4l5 5V4L7 9H3z"/>
+        <path class="sound-wave" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+        <path class="sound-wave" d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+      </svg>
+    </button>
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+
+    <div class="overlay" id="startScreen">
+      <div class="title">FLAPPING BIRD</div>
+      <div class="bird-preview">
+        <div class="preview-body"></div>
+        <div class="preview-eye"></div>
+        <div class="preview-beak"></div>
+        <div class="preview-wing"></div>
+      </div>
+      <div class="instruction">PRESS SPACE OR TAP TO START</div>
+    </div>
+
+    <div class="overlay hidden" id="gameOverScreen">
+      <div class="game-over-title">GAME OVER</div>
+      <div class="score-display">SCORE</div>
+      <div class="current-score" id="finalScore">0</div>
+      <div class="high-score" id="highScoreDisplay">HIGH SCORE: 0</div>
+      <div class="instruction">PRESS SPACE OR TAP TO RESTART</div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const startScreen = document.getElementById('startScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const finalScoreEl = document.getElementById('finalScore');
+    const highScoreDisplayEl = document.getElementById('highScoreDisplay');
+
+    const GRAVITY = 0.5;
+    const FLAP_FORCE = -8;
+    const MAX_FALL_SPEED = 10;
+    const PIPE_WIDTH = 70;
+    const PIPE_GAP = 160;
+    const PIPE_SPACING = 200;
+    const PIPE_SPEED = 3;
+    const GROUND_HEIGHT = 80;
+
+    let gameState = 'start';
+    let score = 0;
+    let highScore = parseInt(localStorage.getItem('flappingBirdHighScore')) || 0;
+    let lastFlapTime = 0;
+    let animationId;
+    let shakeIntensity = 0;
+
+    const bird = {
+      x: 80,
+      y: 300,
+      width: 40,
+      height: 30,
+      velocity: 0,
+      rotation: 0
+    };
+
+    let pipes = [];
+    let groundOffset = 0;
+    let clouds = [];
+    let stars = [];
+
+    /* ============================================
+       SOUND SYSTEM - Web Audio API
+       ============================================ */
+    let audioCtx = null;
+    let isMuted = localStorage.getItem('flappingBirdMuted') === 'true';
+    let bgMusicGain = null;
+    let bgMusicOscillators = [];
+    let hasInteracted = false;
+
+    // Initialize audio context on first user interaction
+    function initAudio() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      hasInteracted = true;
+
+      // Resume audio context if suspended
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // Create master gain node for global volume control
+    let masterGain;
+    function getMasterGain() {
+      if (!masterGain && audioCtx) {
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = isMuted ? 0 : 0.5;
+        masterGain.connect(audioCtx.destination);
+      }
+      return masterGain;
+    }
+
+    // Toggle mute function
+    function toggleMute() {
+      isMuted = !isMuted;
+      localStorage.setItem('flappingBirdMuted', isMuted);
+
+      const muteBtn = document.getElementById('muteBtn');
+      muteBtn.classList.toggle('muted', isMuted);
+
+      if (masterGain) {
+        masterGain.gain.setValueAtTime(isMuted ? 0 : 0.5, audioCtx.currentTime);
+      }
+
+      // Stop background music when muted
+      if (isMuted) {
+        stopBackgroundMusic();
+      } else if (gameState === 'playing') {
+        startBackgroundMusic();
+      }
+    }
+
+    // Flap sound - quick rising chirp
+    let lastFlapSoundTime = 0;
+    function playFlapSound() {
+      if (!hasInteracted) initAudio();
+      if (!audioCtx || isMuted) return;
+
+      // Prevent overlapping sounds (cooldown)
+      const now = Date.now();
+      if (now - lastFlapSoundTime < 80) return;
+      lastFlapSoundTime = now;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.05);
+      osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
+
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+
+      osc.connect(gain);
+      gain.connect(getMasterGain());
+
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.1);
+    }
+
+    // Score sound - pleasant ding/chime
+    let lastScoreSoundTime = 0;
+    function playScoreSound() {
+      if (!audioCtx || isMuted) return;
+
+      const now = Date.now();
+      if (now - lastScoreSoundTime < 100) return;
+      lastScoreSoundTime = now;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.05);
+
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+      osc.connect(gain);
+      gain.connect(getMasterGain());
+
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.15);
+    }
+
+    // Hit/collision sound - low thud
+    function playHitSound() {
+      if (!audioCtx || isMuted) return;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.15);
+
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+      osc.connect(gain);
+      gain.connect(getMasterGain());
+
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.15);
+    }
+
+    // Game over sound - descending sad tone
+    function playGameOverSound() {
+      if (!audioCtx || isMuted) return;
+
+      const notes = [440, 392, 349, 330];
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.15);
+
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime + i * 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.15 + 0.14);
+
+        osc.connect(gain);
+        gain.connect(getMasterGain());
+
+        osc.start(audioCtx.currentTime + i * 0.15);
+        osc.stop(audioCtx.currentTime + i * 0.15 + 0.15);
+      });
+    }
+
+    // Start sound - uplifting quick chirp sequence
+    function playStartSound() {
+      if (!audioCtx || isMuted) return;
+
+      const notes = [523, 659, 784];
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.08);
+
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime + i * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.08 + 0.07);
+
+        osc.connect(gain);
+        gain.connect(getMasterGain());
+
+        osc.start(audioCtx.currentTime + i * 0.08);
+        osc.stop(audioCtx.currentTime + i * 0.08 + 0.08);
+      });
+    }
+
+    // Background ambience - retro synth pad
+    function startBackgroundMusic() {
+      if (!audioCtx || isMuted || bgMusicOscillators.length > 0) return;
+
+      // Create low drone
+      const droneOsc = audioCtx.createOscillator();
+      const droneGain = audioCtx.createGain();
+      const droneFilter = audioCtx.createBiquadFilter();
+
+      droneOsc.type = 'sine';
+      droneOsc.frequency.value = 55; // Low A
+
+      droneFilter.type = 'lowpass';
+      droneFilter.frequency.value = 200;
+
+      droneGain.gain.value = 0.08;
+
+      droneOsc.connect(droneFilter);
+      droneFilter.connect(droneGain);
+      droneGain.connect(getMasterGain());
+
+      droneOsc.start();
+      bgMusicOscillators.push({ osc: droneOsc, gain: droneGain });
+
+      // Create subtle pulsing synth
+      const pulseOsc = audioCtx.createOscillator();
+      const pulseGain = audioCtx.createGain();
+      const pulseFilter = audioCtx.createBiquadFilter();
+
+      pulseOsc.type = 'triangle';
+      pulseOsc.frequency.value = 110;
+
+      pulseFilter.type = 'lowpass';
+      pulseFilter.frequency.value = 300;
+
+      pulseGain.gain.value = 0.04;
+
+      // LFO for pulsing effect
+      const lfo = audioCtx.createOscillator();
+      const lfoGain = audioCtx.createGain();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.5;
+      lfoGain.gain.value = 0.03;
+
+      lfo.connect(lfoGain);
+      lfoGain.connect(pulseGain.gain);
+
+      pulseOsc.connect(pulseFilter);
+      pulseFilter.connect(pulseGain);
+      pulseGain.connect(getMasterGain());
+
+      lfo.start();
+      pulseOsc.start();
+      bgMusicOscillators.push({ osc: pulseOsc, gain: pulseGain }, { osc: lfo, gain: lfoGain });
+
+      // Create high shimmer
+      const shimmerOsc = audioCtx.createOscillator();
+      const shimmerGain = audioCtx.createGain();
+      const shimmerFilter = audioCtx.createBiquadFilter();
+
+      shimmerOsc.type = 'sine';
+      shimmerOsc.frequency.value = 880;
+
+      shimmerFilter.type = 'highpass';
+      shimmerFilter.frequency.value = 600;
+
+      shimmerGain.gain.value = 0.015;
+
+      shimmerOsc.connect(shimmerFilter);
+      shimmerFilter.connect(shimmerGain);
+      shimmerGain.connect(getMasterGain());
+
+      shimmerOsc.start();
+      bgMusicOscillators.push({ osc: shimmerOsc, gain: shimmerGain });
+    }
+
+    function stopBackgroundMusic() {
+      bgMusicOscillators.forEach(item => {
+        try {
+          item.osc.stop();
+        } catch (e) {}
+      });
+      bgMusicOscillators = [];
+    }
+
+    // Setup mute button
+    document.getElementById('muteBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      initAudio();
+      toggleMute();
+    });
+
+    // Apply initial mute state
+    if (isMuted) {
+      document.getElementById('muteBtn').classList.add('muted');
+    }
+    /* ============================================
+       END SOUND SYSTEM
+       ============================================ */
+
+    function init() {
+      clouds = [];
+      stars = [];
+      for (let i = 0; i < 5; i++) {
+        clouds.push({
+          x: Math.random() * canvas.width,
+          y: 50 + Math.random() * 150,
+          width: 60 + Math.random() * 40,
+          speed: 0.5 + Math.random() * 0.5
+        });
+      }
+      for (let i = 0; i < 30; i++) {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * (canvas.height - GROUND_HEIGHT - 100),
+          size: 1 + Math.random() * 2,
+          twinkle: Math.random() * Math.PI * 2
+        });
+      }
+    }
+
+    function resetGame() {
+      bird.x = 80;
+      bird.y = 300;
+      bird.velocity = 0;
+      bird.rotation = 0;
+      pipes = [];
+      score = 0;
+      shakeIntensity = 0;
+      groundOffset = 0;
+
+      for (let i = 0; i < 3; i++) {
+        addPipe(400 + i * PIPE_SPACING);
+      }
+    }
+
+    function addPipe(x) {
+      const minY = 100;
+      const maxY = canvas.height - GROUND_HEIGHT - PIPE_GAP - 100;
+      const gapY = minY + Math.random() * (maxY - minY);
+
+      pipes.push({
+        x: x,
+        gapY: gapY,
+        passed: false
+      });
+    }
+
+    function drawBackground() {
+      const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      gradient.addColorStop(0, '#1a1a2e');
+      gradient.addColorStop(1, '#16213e');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#ffffff';
+      stars.forEach(star => {
+        star.twinkle += 0.05;
+        const alpha = 0.5 + Math.sin(star.twinkle) * 0.5;
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+
+      clouds.forEach(cloud => {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.beginPath();
+        ctx.arc(cloud.x, cloud.y, 30, 0, Math.PI * 2);
+        ctx.arc(cloud.x + 25, cloud.y - 10, 25, 0, Math.PI * 2);
+        ctx.arc(cloud.x + 50, cloud.y, 30, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function updateClouds() {
+      clouds.forEach(cloud => {
+        cloud.x -= cloud.speed;
+        if (cloud.x + 80 < 0) {
+          cloud.x = canvas.width + 40;
+        }
+      });
+    }
+
+    function drawGround() {
+      ctx.fillStyle = '#2d3436';
+      ctx.fillRect(0, canvas.height - GROUND_HEIGHT, canvas.width, GROUND_HEIGHT);
+
+      ctx.fillStyle = '#00b894';
+      for (let i = 0; i < canvas.width + 20; i += 20) {
+        const x = (i - groundOffset) % (canvas.width + 20) - 20;
+        ctx.beginPath();
+        ctx.moveTo(x, canvas.height - GROUND_HEIGHT);
+        ctx.lineTo(x + 10, canvas.height - GROUND_HEIGHT - 15);
+        ctx.lineTo(x + 20, canvas.height - GROUND_HEIGHT);
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = '#636e72';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height - GROUND_HEIGHT);
+      ctx.lineTo(canvas.width, canvas.height - GROUND_HEIGHT);
+      ctx.stroke();
+    }
+
+    function drawBird() {
+      ctx.save();
+      ctx.translate(bird.x + bird.width / 2, bird.y + bird.height / 2);
+      ctx.rotate(bird.rotation);
+
+      ctx.fillStyle = '#ffd93d';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, bird.width / 2, bird.height / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ff6b35';
+      ctx.beginPath();
+      ctx.ellipse(-5, 5, 12, 8, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(10, -5, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#1a1a2e';
+      ctx.beginPath();
+      ctx.arc(12, -5, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ff6b35';
+      ctx.beginPath();
+      ctx.moveTo(18, 2);
+      ctx.lineTo(32, 6);
+      ctx.lineTo(18, 10);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawPipes() {
+      pipes.forEach(pipe => {
+        ctx.fillStyle = '#2d3436';
+        ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.gapY - PIPE_GAP / 2);
+        ctx.fillRect(pipe.x, pipe.gapY + PIPE_GAP / 2, PIPE_WIDTH, canvas.height - GROUND_HEIGHT - pipe.gapY - PIPE_GAP / 2);
+
+        ctx.fillStyle = '#636e72';
+        ctx.fillRect(pipe.x + 5, 0, 5, pipe.gapY - PIPE_GAP / 2 - 20);
+        ctx.fillRect(pipe.x + 5, pipe.gapY + PIPE_GAP / 2 + 20, 5, canvas.height - GROUND_HEIGHT - pipe.gapY - PIPE_GAP / 2 - 20);
+
+        ctx.fillStyle = '#2d3436';
+        ctx.fillRect(pipe.x - 5, pipe.gapY - PIPE_GAP / 2 - 25, PIPE_WIDTH + 10, 25);
+        ctx.fillRect(pipe.x - 5, pipe.gapY + PIPE_GAP / 2, PIPE_WIDTH + 10, 25);
+
+        ctx.fillStyle = '#636e72';
+        ctx.fillRect(pipe.x + 5, pipe.gapY - PIPE_GAP / 2 - 20, PIPE_WIDTH - 10, 5);
+        ctx.fillRect(pipe.x + 5, pipe.gapY + PIPE_GAP / 2 + 20, PIPE_WIDTH - 10, 5);
+
+        ctx.shadowColor = 'rgba(0, 184, 148, 0.3)';
+        ctx.shadowBlur = 15;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.fillStyle = 'transparent';
+        ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.gapY - PIPE_GAP / 2);
+        ctx.fillRect(pipe.x, pipe.gapY + PIPE_GAP / 2, PIPE_WIDTH, canvas.height - GROUND_HEIGHT - pipe.gapY - PIPE_GAP / 2);
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+      });
+    }
+
+    function drawScore() {
+      ctx.font = '32px "Press Start 2P"';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#000000';
+      ctx.fillText(score, canvas.width / 2 + 3, 43);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(score, canvas.width / 2, 40);
+    }
+
+    function update() {
+      if (gameState !== 'playing') return;
+
+      bird.velocity += GRAVITY;
+      if (bird.velocity > MAX_FALL_SPEED) {
+        bird.velocity = MAX_FALL_SPEED;
+      }
+      bird.y += bird.velocity;
+
+      bird.rotation = Math.min(Math.max(bird.velocity * 4, -30), 90) * Math.PI / 180;
+
+      if (bird.y < 0) {
+        bird.y = 0;
+        bird.velocity = 0;
+      }
+
+      if (bird.y + bird.height > canvas.height - GROUND_HEIGHT) {
+        gameOver();
+        return;
+      }
+
+      pipes.forEach(pipe => {
+        pipe.x -= PIPE_SPEED;
+
+        if (!pipe.passed && pipe.x + PIPE_WIDTH < bird.x) {
+          pipe.passed = true;
+          score++;
+          // Play score sound exactly when score increases
+          playScoreSound();
+        }
+      });
+
+      pipes = pipes.filter(pipe => pipe.x + PIPE_WIDTH > 0);
+
+      if (pipes.length > 0) {
+        const lastPipe = pipes[pipes.length - 1];
+        if (lastPipe.x < canvas.width - PIPE_SPACING) {
+          addPipe(canvas.width);
+        }
+      }
+
+      pipes.forEach(pipe => {
+        const birdLeft = bird.x + 5;
+        const birdRight = bird.x + bird.width - 5;
+        const birdTop = bird.y + 5;
+        const birdBottom = bird.y + bird.height - 5;
+
+        const pipeLeft = pipe.x;
+        const pipeRight = pipe.x + PIPE_WIDTH;
+        const topPipeBottom = pipe.gapY - PIPE_GAP / 2;
+        const bottomPipeTop = pipe.gapY + PIPE_GAP / 2;
+
+        if (birdRight > pipeLeft && birdLeft < pipeRight) {
+          if (birdTop < topPipeBottom || birdBottom > bottomPipeTop) {
+            gameOver();
+          }
+        }
+      });
+
+      groundOffset = (groundOffset + PIPE_SPEED) % 20;
+
+      if (shakeIntensity > 0) {
+        shakeIntensity *= 0.9;
+      }
+    }
+
+    function draw() {
+      ctx.save();
+      if (shakeIntensity > 0.5) {
+        ctx.translate(
+          (Math.random() - 0.5) * shakeIntensity,
+          (Math.random() - 0.5) * shakeIntensity
+        );
+      }
+
+      drawBackground();
+      updateClouds();
+      drawPipes();
+      drawGround();
+      drawBird();
+
+      if (gameState === 'playing') {
+        drawScore();
+      }
+
+      ctx.restore();
+    }
+
+    function gameLoop() {
+      update();
+      draw();
+      animationId = requestAnimationFrame(gameLoop);
+    }
+
+    function startGame() {
+      initAudio();
+      gameState = 'playing';
+      startScreen.classList.add('hidden');
+      gameOverScreen.classList.add('hidden');
+      resetGame();
+
+      // Play start sound when leaving start screen
+      if (wasAtStart) {
+        playStartSound();
+        wasAtStart = false;
+      }
+
+      // Start background music
+      if (!isMuted) {
+        startBackgroundMusic();
+      }
+    }
+
+    let wasAtStart = true;
+
+    function gameOver() {
+      gameState = 'gameover';
+      shakeIntensity = 15;
+
+      // Play hit sound immediately on collision
+      playHitSound();
+
+      // Play game over sound after short delay
+      setTimeout(() => {
+        playGameOverSound();
+      }, 200);
+
+      // Stop background music
+      stopBackgroundMusic();
+
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('flappingBirdHighScore', highScore);
+      }
+
+      finalScoreEl.textContent = score;
+      highScoreDisplayEl.textContent = `HIGH SCORE: ${highScore}`;
+
+      setTimeout(() => {
+        gameOverScreen.classList.remove('hidden');
+        wasAtStart = false;
+      }, 500);
+    }
+
+    function flap() {
+      const now = Date.now();
+      if (now - lastFlapTime < 100) return;
+      lastFlapTime = now;
+
+      if (gameState === 'start') {
+        startGame();
+      } else if (gameState === 'playing') {
+        bird.velocity = FLAP_FORCE;
+        // Play flap sound instantly on input
+        playFlapSound();
+      } else if (gameState === 'gameover') {
+        startGame();
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        flap();
+      }
+    });
+
+    canvas.addEventListener('click', flap);
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      flap();
+    });
+
+    window.addEventListener('blur', () => {
+      if (gameState === 'playing') {
+        gameState = 'paused';
+      }
+    });
+
+    window.addEventListener('focus', () => {
+      if (gameState === 'paused') {
+        gameState = 'playing';
+      }
+    });
+
+    init();
+    gameLoop();
+  </script>
+</body>
+</html>
